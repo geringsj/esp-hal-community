@@ -47,7 +47,7 @@ use esp_hal::{
     gpio::{Level, interconnect::PeripheralOutput},
     rmt::{Channel, Error as RmtError, PulseCode, Tx, TxChannelConfig, TxChannelCreator},
 };
-use rgb::Grb;
+use rgb::{Grb, Rgb};
 use smart_leds_trait::{SmartLedsWrite, SmartLedsWriteAsync};
 
 // Required RMT RAM to drive one LED.
@@ -200,10 +200,7 @@ impl<'ch, const BUFFER_SIZE: usize> SmartLedsAdapter<'ch, BUFFER_SIZE, Grb<u8>> 
     }
 }
 
-impl<'ch, const BUFFER_SIZE: usize, Color> SmartLedsAdapter<'ch, BUFFER_SIZE, Color>
-where
-    Color: rgb::ComponentSlice<u8>,
-{
+impl<'ch, const BUFFER_SIZE: usize, Color> SmartLedsAdapter<'ch, BUFFER_SIZE, Color> {
     /// Create a new adapter object that drives the pin using the RMT channel.
     pub fn new_with_color<C, O>(
         channel: C,
@@ -228,10 +225,8 @@ where
     }
 }
 
-impl<'ch, const BUFFER_SIZE: usize, Color> SmartLedsWrite
+impl<'ch, const BUFFER_SIZE: usize, Color: rgb::Pod> SmartLedsWrite
     for SmartLedsAdapter<'ch, BUFFER_SIZE, Color>
-where
-    Color: rgb::ComponentSlice<u8>,
 {
     type Error = LedAdapterError;
     type Color = Color;
@@ -251,7 +246,11 @@ where
         // This will result in an `BufferSizeExceeded` error in case
         // the iterator provides more elements than the buffer can take.
         for item in iterator {
-            convert_to_pulses(item.into().as_slice(), &mut seq_iter, self.pulses)?;
+            convert_to_pulses(
+                rgb::bytemuck::cast_slice(&[item.into()]),
+                &mut seq_iter,
+                self.pulses,
+            )?;
         }
 
         // Finally, add an end element.
@@ -318,9 +317,8 @@ impl<'ch, const BUFFER_SIZE: usize> SmartLedsAdapterAsync<'ch, BUFFER_SIZE, Grb<
     }
 }
 
-impl<'ch, const BUFFER_SIZE: usize, Color> SmartLedsAdapterAsync<'ch, BUFFER_SIZE, Color>
-where
-    Color: rgb::ComponentSlice<u8>,
+impl<'ch, const BUFFER_SIZE: usize, Color: rgb::Pod>
+    SmartLedsAdapterAsync<'ch, BUFFER_SIZE, Color>
 {
     /// Create a new adapter object that drives the pin using the RMT channel.
     pub fn new_with_color<C, O>(
@@ -356,7 +354,11 @@ where
         // This will result in an `BufferSizeExceeded` error in case
         // the iterator provides more elements than the buffer can take.
         for item in iterator {
-            Self::convert_to_pulses(item.into().as_slice(), &mut seq_iter, self.pulses)?;
+            Self::convert_to_pulses(
+                rgb::bytemuck::cast_slice(&[item.into()]),
+                &mut seq_iter,
+                self.pulses,
+            )?;
         }
         Ok(())
     }
@@ -375,10 +377,8 @@ where
     }
 }
 
-impl<'ch, const BUFFER_SIZE: usize, Color> SmartLedsWriteAsync
+impl<'ch, const BUFFER_SIZE: usize, Color: rgb::Pod> SmartLedsWriteAsync
     for SmartLedsAdapterAsync<'ch, BUFFER_SIZE, Color>
-where
-    Color: rgb::ComponentSlice<u8>,
 {
     type Error = LedAdapterError;
     type Color = Color;
